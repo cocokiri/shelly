@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+        section {
+            display: flex;
+
+        }
+        .sidebar {
+            display:flex;
+            flex-direction:column;
+            flex: 1;
+            padding: 1em;
+            background: black;
+            color: white;
+            text-align: center;
+        }
+        
+
+    </style>
+    <meta charset="UTF-8">
+    <title>Shelly</title>
+</head>
+
+
+<body>
+
+
+<div id="GUI" style="display:none">
+</div>
+
+<section>
+    <canvas id="canv"></canvas>
+    <div class="sidebar">
+        <input id="messageField" type="text" defaultValue="Hallo">
+        <button id="send">Send</button>
+        <div id="history"></div>
+    </div>
+</section>
+
+</body>
+</html>
+
+<script>
+
+    const message = document.getElementById("messageField")
+    const radPerDeg = 1/180 * Math.PI;
+    const sendBtn = document.getElementById("send");
+    const historyDiv = document.getElementById("history");
+
+    sendBtn.onmousedown = function (e) {
+        turtle.receive(message.value);
+
+        let mess = document.createElement("div");
+        mess.innerHTML = message.value;
+        historyDiv.insertBefore(mess, historyDiv.firstChild);
+        message.value = "";
+
+    }
+
+
+    const canvas = document.getElementById("canv");
+    canvas.width = window.innerWidth * 2/3;
+    canvas.height = window.innerHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.transform(1, 0, 0, -1, 0, canvas.height); //ctx spiegeln damit jeder
+
+
+    function pixelPerUnit(xUnits, yUnits, canvas) {
+        let x = canvas.width / xUnits;
+        let y = canvas.height / yUnits;
+        return [x, y];
+    }
+
+    function UnitToPixel(scaleUnits, units) {
+        let obj;
+        obj.x = units.x * scaleUnits[0];
+        obj.y = units.y * scaleUnits[1];
+        return obj;
+    }
+
+
+    class GUI {
+        constructor(div) {
+            this.div = div;
+            this.div.style.position = "absolute";
+
+        }
+
+        bindToTurtle(turtle) {
+            this.turtle = turtle;
+            let that = this;
+            let abilities = this.turtle.getAbilities();
+            abilities.forEach(function (el) {
+                let btn = document.createElement("button");
+                btn.innerHTML = el;
+                btn.onmousedown = function(ev) {
+                    message.value += " " + el;
+                    that.div.style.display = "none";
+                }
+                this.div.appendChild(btn);
+
+            }.bind(this));
+        }
+
+        show(x, y) {
+            this.div.style.left = x + "px";
+            this.div.style.top = y + "px";
+            this.div.style.display = "block";
+        }
+    }
+
+    class Turtle {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.nextX = x;
+            this.nextY = y;
+            this.dx = 0;
+            this.dy = 0;
+            this.speed = 0.1;
+            this.angle = 0;
+            this.lines = [{x:this.x, y: this.y}];
+        }
+
+        tick() {
+            if (this.x !== this.nextX || this.y !== this.nextY) {
+                this.x += this.dx * this.speed;
+                this.y += this.dy * this.speed;
+            }
+        }
+
+        render(ctx) {
+            ctx.beginPath();
+            ctx.lineWidth=5;
+            ctx.moveTo(this.lines[0].x, this.lines[0].y);
+            for (let line of this.lines) {
+                ctx.lineTo(line.x, line.y);
+            }
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.rect(this.x-15, this.y-15, 30, 30);
+            ctx.fill();
+        }
+
+        contains(x, y) {
+            return Math.abs(x - this.x - 15) < 30 && Math.abs(y - this.y - 15) < 30;
+        }
+
+        receive(message) {
+            message = message.split(' ')[1];
+            if (message === 'forward') {
+                this.nextY += 100 * Math.sin(this.angle * radPerDeg);
+                this.nextX += 100 * Math.cos(this.angle * radPerDeg);
+            }
+            if (message === 'left') {
+                this.angle += 90;          }
+            if (message === 'right') {
+
+                this.angle -= 90;
+            }
+            if (message === 'backward') {
+                this.nextY -= 100 * Math.sin(this.angle * radPerDeg);
+                this.nextX -= 100 * Math.cos(this.angle * radPerDeg);
+            }
+
+
+            this.nextX = Math.round(this.nextX);
+            this.nextY = Math.round(this.nextY);
+
+            this.lines.push({x: this.nextX, y: this.nextY});
+
+            this.dx = this.nextX - this.x;
+            this.dy = this.nextY - this.y;
+
+            console.log(this.dx, this.dy);
+
+        }
+
+        getAbilities() {
+            return ['forward', 'left', 'right', 'backward'];
+        }
+    }
+
+    let turtle = new Turtle(30, 30);
+    let gui = new GUI(document.getElementById("GUI"));
+    gui.bindToTurtle(turtle);
+
+    function loop() {
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+//        console.log("looping");
+
+        turtle.tick();
+        turtle.render(ctx);
+
+        requestAnimationFrame(loop);
+    }
+
+
+    //    canvas.onmousedown = (e) => console.log(e + "canv")
+    canvas.onmousedown = function (e) {
+        console.log("click");
+        if (turtle.contains(e.pageX, canvas.height - e.pageY)) { //wegen transform
+            console.log("ASdad");
+
+            gui.show(e.pageX, e.pageY);
+
+            message.value = "Shelly";
+
+        }
+    };
+
+    loop();
+
+
+    function resizeCanvas(cv) {
+        if (cv.width < window.innerWidth || cv.width > window.innerWidth) {
+            cv.width = window.innerWidth;
+        }
+
+        if (cv.height < window.innerHeight || cv.height > window.innerHeight) {
+            cv.height = window.innerHeight;
+        }
+        console.log("cv resized: " + cv.height + "H" + " & " + cv.width + "W");
+    }
+
+</script>
